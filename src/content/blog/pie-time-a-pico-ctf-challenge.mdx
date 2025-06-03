@@ -36,13 +36,7 @@ This snippet gives us full control over where the program jumps. All we need is 
 
 ### 1. Check Binary Protections
 
-We start by checking the binary's protections using `checksec`.
-
-```bash
-checksec vuln
-```
-
-This confirms that PIE is enabled.
+We start by checking the binary's protections using `checksec` in pwndbg. This confirms that PIE is enabled.
 
 <img src="/pietime/checksec.png" alt="Checksec Output" style={{ width: "100%" }} />
 
