@@ -36,80 +36,161 @@ This snippet gives us full control over where the program jumps. All we need is 
 
 ### 1. Check Binary Protections
 
-Using `checksec`, we confirm that PIE is enabled:
+We start by checking the binary's protections using `checksec`.
 
-![Checksec Output](../../assets/pietime/checksec.png)
+```bash
+checksec vuln
+```
 
-This means the binary’s memory layout changes on each run. Hardcoded addresses won't work.
+This confirms that PIE is enabled.
+
+<img src="/pietime/checksec.png" alt="Checksec Output" style={{ width: "100%" }} />
+
+Because of PIE, the program’s memory layout will change every time it runs. That means we can’t rely on hardcoded addresses.
 
 ---
 
 ### 2. Get the Offset of `win()`
 
-We use `nm` to find the relative location of `win()`:
+Next, we need the relative offset of the `win()` function inside the binary.
+
+We run:
 
 ```bash
 nm vuln | grep ' win'
+```
+
+Output:
+
+```bash
 00000000000012a7 T win
 ```
 
-The `win()` function is located at offset `0x12a7` from the base.
+This tells us that `win()` is located at offset `0x12a7` from the base of the binary.
 
 ---
 
 ### 3. Calculate the Runtime Address
 
-When we run the binary in `pwndbg` and use `vmmap`, we can find the base address where the binary is loaded:
+To get the actual runtime address of `win()`, we follow these steps:
 
-![VMMap Output](../../assets/pietime/vmmap.png)
+#### a. Run the binary in `pwndbg`
 
-Assuming the base is `0x555555554000`, the address of `win()` becomes:
+```bash
+pwndbg ./vuln
+r
+```
+
+#### b. Use `vmmap` to find the base address
+
+Once the binary is running, type:
+
+```bash
+vmmap
+```
+
+This gives us the memory layout. Look for the base address where the binary is loaded.
+
+<img src="/pietime/vmmap.png" alt="VMMap Output" style={{ width: "100%" }} />
+
+Let’s say the base address is:
+
+```
+0x555555554000
+```
+
+#### c. Add the offset of `win()` to the base address
 
 ```bash
 0x555555554000 + 0x12a7 = 0x55555555412a7
 ```
 
+That’s the runtime address we’ll use.
+
+---
+
+#### 🧠 Why We Used `0x555555554000` as the Base
+
+Even though the `.text` section (actual code) starts at `0x555555555000`, the offsets reported by `nm` are relative to the very start of the ELF binary — which is `0x555555554000`.
+
+```bash
+00000000000012a7 T win
+```
+
+This means `win()` is located 0x12a7 bytes from the start of the ELF.
+
+So the correct address is:
+
+```bash
+real_address = 0x555555554000  # base from vmmap
+             + 0x12a7         # offset from nm
+             = 0x5555555552a7
+```
+
+Using `0x555555555000` instead would result in an incorrect jump — 0x100 bytes too early — and most likely a crash.
+
+---
+
+#### 📦 How PIE and ELF Mapping Work
+
+When a PIE binary is loaded:
+
+- The entire ELF binary (headers + code + data) is mapped starting at the base, e.g., `0x555555554000`
+- The `.text` section typically starts at offset `0x1000`, making its virtual address `0x555555555000`
+- However, all function offsets from `nm` are relative to the start of the binary, not the `.text` section
+
+To get the real address of a function:
+1. Get the base address using `vmmap`
+2. Add the function's offset from `nm`
+
 ---
 
 ### 4. Jump to `win()`
 
-We enter the calculated address into the program, which then jumps to `win()`:
+Now that we have the runtime address of `win()`, we run the binary normally and input the address when prompted:
 
-![Run the binary](../../assets/pietime/flag.png)
+```bash
+Enter the address to jump to, ex => 0x12345: 0x55555555412a7
+```
 
-And just like that, the flag is printed.
+<img src="/pietime/flag.png" alt="Flag Printed" style={{ width: "100%" }} />
+
+That jumps directly into `win()` and prints the flag.
 
 ---
 
-### 5. Apply It Remotely
+### 5. Run It on the Remote Server
 
-On the remote challenge server, the binary prints the address of `main()` when it runs. We can work backwards:
+When we connect to the remote instance via `nc`, the program prints the address of `main()`.
 
-- Subtract the static offset of `main()` to find the base
-- Add `0x12a7` to compute the address of `win()`
+We do the following:
 
-Entering that value gets us the flag:
+1. Subtract the known offset of `main()` from that address to get the base
+2. Add `0x12a7` to get the address of `win()`
+3. Enter that value when prompted
 
-![Testing](../../assets/pietime/testing.png)
+<img src="/pietime/testing.png" alt="Remote Execution" style={{ width: "100%" }} />
 
 ---
 
 ## 💡 Understanding PIE and Offsets
 
-In PIE-enabled binaries, absolute addresses change, but relative offsets remain constant.
+In PIE-enabled binaries:
+- Absolute addresses are randomized on each run
+- Offsets inside the binary stay consistent
+
+So, if we can figure out the base address at runtime, we can always find `win()`.
 
 > `win()` is always 0x12a7 bytes after the base address.
-
-As long as we know the current base, we can reliably calculate the address of `win()`.
 
 ---
 
 ## 🧠 Final Thoughts
 
-This challenge is a solid example of how understanding memory layout and binary behavior can be just as effective as more advanced exploitation techniques. No overflows or gadgets needed—just a calculated jump.
+This challenge is a great intro to PIE exploitation: no stack smashing, no weird shellcode — just pure calculated jumping based on offsets.
 
 ---
 
-## 🔗 Additional Resources
+## 🔗 Challenge Link
 
 - [PIE TIME | PicoCTF Challenge](https://play.picoctf.org/practice/challenge/490)
