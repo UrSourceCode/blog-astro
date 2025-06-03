@@ -1,0 +1,119 @@
+---
+title: 'PIE TIME - A PicoCTF Challenge'
+description: 'How I outsmarted PIE with nothing but offsets, good timing, and a little bit of luck.'
+pubDate: 'Jun 03 2025'
+heroImage: '/blog-placeholder-5.jpg'
+categories: ["CTF", "PicoCTF", "Binary Exploitation"]
+---
+
+## 🥧 Challenge Overview
+
+This one's called **PIE TIME**, and no, it’s not dessert — though it was a treat for me as a binary exploitation fan. My goal? Jump into the `win()` function and steal the flag, all while dancing around a PIE-enabled binary that kept changing memory addresses like it had something to hide.
+
+I was given two files:
+- `vuln` — the compiled binary
+- `vuln.c` — the source code (a.k.a. my roadmap)
+
+---
+
+## 🧩 What Was I Dealing With?
+
+Here’s the juicy part of the code:
+
+```c
+scanf("%lx", &val);
+void (*foo)(void) = (void (*)())val;
+foo();
+```
+
+It literally said: “Tell me where to jump.” And I was more than happy to oblige.
+
+---
+
+## 🔍 How I Cracked It
+
+### Step 1: Checked for PIE
+
+I ran `checksec` inside `pwndbg` to see what I was working with:
+
+![Checksec Output](../../assets/pietime/checksec.png)
+
+Sure enough, PIE was enabled — meaning I couldn’t rely on fixed addresses. Direct jumps were off the table. But I had another plan.
+
+---
+
+### Step 2: Found the `win()` Offset
+
+Using `nm`, I found the offset of the `win()` function:
+
+```bash
+nm vuln | grep ' win'
+00000000000012a7 T win
+```
+
+So `win()` lives at `0x12a7` relative to the binary's base. That offset is my anchor — it never changes.
+
+---
+
+### Step 3: Got the Base Address at Runtime
+
+I launched the binary with `pwndbg`, then used `vmmap` to see where it got loaded:
+
+![VMMap Output](../../assets/pietime/vmmap.png)
+
+Let’s say the base was:
+```
+0x555555554000
+```
+
+All I had to do was add the offset:
+
+```bash
+0x555555554000 + 0x12a7 = 0x55555555412a7
+```
+
+Boom — that gave me the live address of `win()`.
+
+---
+
+### Step 4: Made the Jump
+
+I ran the binary, fed it my freshly-calculated address, and...
+
+![Run the binary](../../assets/pietime/flag.png)
+
+Success! The flag was mine. Sweet, sweet victory.
+
+---
+
+### Step 5: Did It Live on the Server
+
+The remote instance gave me the current `main()` address when I connected via `nc`. From there, I calculated the base address by subtracting the known offset of `main`, then added `0x12a7` to jump straight into `win()`.
+
+![Testing](../../assets/pietime/testing.png)
+
+And yes — it worked like a charm.
+
+---
+
+## 💡 What I Learned About Offsets
+
+Offsets are just distances. They don’t care where the binary lives — they only care how far one thing is from another.
+
+> In this case, `win()` is always 0x12a7 bytes after the start of the binary.
+
+So even with PIE doing its thing, as long as I had the base, I had the way in.
+
+---
+
+## 🧠 Final Thoughts
+
+I didn’t need a fancy buffer overflow. No shellcode. No ROP chains. Just some math, a little observation, and an open invitation from the program to do whatever I wanted.
+
+This challenge was clean, clever, and honestly pretty fun to pull off.
+
+---
+
+## 🔗 Extra Credit
+
+- [PIE TIME | PicoCTF Challenge](https://play.picoctf.org/practice/challenge/490)

@@ -1,0 +1,18 @@
+---
+import { getCollection } from 'astro:content';
+
+const category = Astro.params.category!;
+const posts = await getCollection('blog', ({ data }) =>
+  data.categories?.includes(category)
+);
+---
+
+<h1>Posts in {category}</h1>
+
+<ul>
+  {posts.map((post) => (
+    <li>
+      <a href={`/blog/${post.id}/`}>{post.data.title}</a>
+    </li>
+  ))}
+</ul>
