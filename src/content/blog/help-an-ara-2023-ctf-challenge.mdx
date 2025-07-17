@@ -1,0 +1,48 @@
+---
+title: 'Help - An ARA 2023 CTF Challenge'
+description: 'A hands-on walkthrough of exploiting a file upload vulnerability to gain remote command execution and escalate to root.'
+pubDate: 'Feb 26 2023'
+heroImage: '/blog-placeholder-3.jpg'
+categories: ["CTF", "ARA CTF 2023", "Cryptography"]
+---
+
+## 🥧 Challenge Overview
+Help is a Cryptography challenge that giving us 32 separate 7-bit binary numbers without any clear instruction. However, a small clue hidden in the description — _"display in the office"_ — points us toward an unconventional but clever decoding method.
+
+The objective: interpret the 7-bit binary values as representations of characters on a **seven-segment display**, and reveal the hidden flag.
+
+## 🧠 Investigation and Discovery
+
+At first glance, the given binary values didn’t seem to follow any standard ASCII format. After trying common decoding methods without success, one phrase stood out in the challenge prompt:
+
+> display in the office
+
+This prompted a new line of thinking — what if these binary values weren’t characters in a traditional encoding scheme, but rather **segment activations on a seven-segment digital display**, like those used in clocks or calculators?
+
+After Googling _"display in 7-bit binary"_, the results were promising:
+
+<img src="/help/googling.png" alt="Google result about 7-bit display" style={{ width: "100%" }} />
+
+The idea: each 7-bit binary represents one combination of segments (a-g) being turned on or off on a seven-segment display. This method is often used in embedded systems and digital clocks.
+
+## 🔧 Tools and Manual Work
+
+I tried using [this dCode seven-segment decoder](https://www.dcode.fr/7-segment-display) to convert each binary to a character, but the results were inconsistent. Some characters showed up as symbols or gibberish, likely due to ambiguity in how seven-segment displays handle lowercase letters or undefined combinations.
+
+<img src="/help/result.png" alt="dCode results" style={{ width: "100%" }} />
+
+So instead of relying on automated tools, I took the analog approach: pen and paper.
+
+I manually sketched out each 7-bit pattern using seven-segment layouts, treating each bit as a segment (a-g). From this, I was able to deduce the actual characters being formed.
+
+It was **mindblowing** how well it worked:
+
+<img src="/help/manual.jpg" alt="Manual decoding on notebook" style={{ width: "100%" }} />
+
+---
+
+## 🚩 The Final Flag
+
+After decoding all 32 seven-segment binaries manually, I was able to spell out the flag:
+
+ARA2023{supertranscendentess_it_is_hehe}
