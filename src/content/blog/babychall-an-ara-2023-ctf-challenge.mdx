@@ -1,0 +1,68 @@
+---
+title: Babychall - An ARA 2023 CTF Challenge'
+description: 'A walkthrough of the Babychall RSA challenge from ARA 2023, solved using the Chinese Remainder Theorem against multiple ciphertexts with a common small exponent.'
+pubDate: 'Feb 26 2023'
+heroImage: '/blog-placeholder-4.jpg'
+categories: ["CTF", "ARA CTF 2023", "Cryptography"]
+---
+
+## 👶 Challenge Overview
+
+This crypto challenge, "Babychall," was a follow-up to a previous one. This time, instead of being given all the RSA parameters, we were only provided with three pairs of ciphertexts and their corresponding moduli.
+
+The challenge gave us these sets of numbers:
+* **Set 1:** `c1`, `n1`
+* **Set 2:** `c2`, `n2`
+* **Set 3:** `c3`, `n3`
+
+The public exponent `e` was missing. The goal was to take these three encrypted messages and figure out the original plaintext flag.
+
+---
+
+## 🧠 Investigation and Discovery
+
+Seeing three different ciphertexts and moduli, my first thought was that the same message was sent to three different recipients. Since the public exponent `e` wasn't provided, I made an assumption that a **common, small exponent** was used for all three encryptions. The most common value for this in CTFs is **`e = 3`**.
+
+This assumption laid out a clear path forward. I was dealing with a system of congruences:
+1.  $M^3 \equiv c_1 \pmod{n_1}$
+2.  $M^3 \equiv c_2 \pmod{n_2}$
+3.  $M^3 \equiv c_3 \pmod{n_3}$
+
+The textbook method for solving a system like this is the **Chinese Remainder Theorem (CRT)**. My plan was to use the CRT to combine these three equations into a single one to find the value of $M^3$.
+
+If my assumption about $e=3$ was correct, and because the message $M$ probably isn't enormous, then $M^3$ would likely be smaller than the product of the moduli ($n_1 \times n_2 \times n_3$). This means I could find the original message $M$ by simply taking the integer cube root of the result from the CRT. The theory felt solid; now I just needed a tool to handle the massive numbers.
+
+---
+
+## 🔧 Cracking the Code with an Online Tool
+
+Manually calculating the CRT for numbers of this size is not feasible. I searched for a tool to solve this specific problem and found a perfect online [RSA CRT Solver](https://asecuritysite.com/rsa/rsa_ctf02).
+
+It was designed for exactly this scenario. All I had to do was:
+1.  Copy and paste the values of `c1`, `n1`, `c2`, `n2`, `c3`, and `n3` into the corresponding fields on the website.
+2.  The tool automatically assumes $e=3$.
+3.  Click solve!
+
+The tool instantly performed the CRT calculation, found the value of $M^3$, computed the cube root, and converted the resulting integer into readable text.
+
+![The online RSA CRT tool successfully decrypts the message, revealing the flag.](assets/crypto-babychall.png)
+
+The output was the flag, confirming my approach was correct.
+
+---
+
+## ✨ Nice to Know: Håstad's Broadcast Attack
+
+After solving the challenge, I learned that my intuitive approach actually has a formal name: **Håstad's Broadcast Attack**. This attack applies specifically to the scenario where a sender encrypts the same message $M$ with a small public exponent $e$ and sends it to multiple recipients, each with their own public modulus $n$.
+
+By using the Chinese Remainder Theorem, an attacker can combine these ciphertexts to reconstruct $M^e$. If $M^e$ is smaller than the product of the moduli, the attacker can then calculate the $e$-th root to recover the original message $M$ directly. It's a classic vulnerability that highlights the dangers of using a low public exponent without proper padding.
+
+---
+
+## 🚩 The Final Flag
+
+Based on the output from the online tool, the decrypted message and the final flag was:
+
+```
+ARA2023{s00000_much_c1ph3r_but_5m4ll_e_5t1ll_d0_th3_j0b}
+```
