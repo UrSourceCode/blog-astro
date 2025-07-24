@@ -28,7 +28,7 @@ My plan was as follows:
 
 I followed my plan using John the Ripper on my Kali Linux environment.
 
-![Copy the file to run directory](/truth/jtr-run-pdf.png)
+<img src="/truth/jtr-run-pdf.png" alt="Copy the file to run directory" style={{ width: "100%" }} />
 
 ### Part 1: Cracking the PDF Password
 
@@ -39,7 +39,7 @@ I ran the following command to generate the hash file:
 pdf2john.pl Truth.pdf > pdf.hash
 ```
 
-![Extracting the password hash from the PDF file using pdf2john.pl](/truth/jtr-hash.png)
+<img src="/truth/jtr-hash.png" alt="Extracting the password hash from the PDF file using pdf2john.pl" style={{ width: "100%" }} />
 
 With pdf.hash ready, I set John the Ripper to work cracking it:
 ```sh
@@ -51,7 +51,7 @@ After a few moments, John successfully found the password. To view it, I used th
 ./john --show pdf.hash
 ```
 
-![John the Ripper successfully cracking the PDF password](/truth/jtr-cracked.png)
+<img src="/truth/jtr-cracked.png" alt="John the Ripper successfully cracking the PDF password" style={{ width: "100%" }} />
 
 The tool revealed that the password was `subarukun`.
 
