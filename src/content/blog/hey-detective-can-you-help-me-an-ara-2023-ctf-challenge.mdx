@@ -1,0 +1,58 @@
+---
+title: 'OSINT - Hey Detective, Can You Help Me'
+description: 'An OSINT CTF write-up for a challenge from ARA 2023 that involved tracking down a cosplayer across Instagram and Facebook to assemble a multi-part flag.'
+pubDate: 'Feb 25 2023'
+heroImage: '/blog-placeholder-1.jpg'
+categories: ["CTF", "ARA CTF 2023", "OSINT"]
+---
+
+## 🕵️‍♀️ Challenge Overview
+
+This OSINT challenge sent us on a digital manhunt. The mission was to identify a specific cosplayer from China based on a handful of clues. We knew she was active on Instagram and Facebook, had collaborated with another cosplayer named "Sakura," and was studying at a top university in China.
+
+The final flag wasn't a simple name but a complex string made of five distinct pieces of information we had to uncover about her life and social media presence.
+
+---
+
+## 🧠 Investigation and Discovery
+
+My investigation started with the most solid lead: the collaborator, **Sakura**. A quick search on Instagram led me to a popular Chinese cosplayer with the username `sakura.gun`. I decided to use her profile as my starting point, digging through her tagged photos and collaborations to find the target.
+
+This became a process of elimination:
+1.  I found a collaboration with a cosplayer named `rakuko`, but she was studying in America, which didn't match the "top university in China" clue.
+2.  Next, I saw photos with `skylaryuuu`, but a check on her profile showed she had moved to Canada. Another dead end.
+3.  The breakthrough came from a non-cosplay photo where Sakura had tagged a friend: `Yanzikenko`. This lead felt different and more promising.
+
+My next move was to pivot platforms. I searched for "Yanzikenko" on Facebook, hoping to find more personal information that would confirm she was the right person and provide the details needed for the flag.
+
+---
+
+## 🔧 Assembling the Flag
+
+The pivot to Facebook was successful! I found a page for **Yanzikenko** filled with photos that matched the challenge's clues. Now, I just had to methodically extract the five pieces for the flag.
+
+1.  **Social Media ID:** The flag required her numeric Instagram ID. I used an online "Instagram User ID finder" with her username `yanzikenko` and got **`44793134117`**.
+
+2.  **University Abbreviation:** I found a graduation photo where she mentioned attending **B**eijing **N**ormal **U**niversity. The abbreviation was clearly **`BNU`**.
+
+3.  **Mascot Name:** In another post, she was at a PopMart doll store. I identified the prominent mascot she posed with as **`Molly`**.
+
+4.  **Bookstore Date & Time:** A clue mentioned a photo of her sitting in a bookstore. I found two possible posts, so I noted both timestamps for trial and error: `3Juni2019-10:25` and `14Februari2019-14:59`.
+
+5.  **The Redacted Part:** This was the toughest piece. I had to sift through dozens of comments on collaboration posts between Yanzikenko and Sakura. Finally, I found a comment that contained the hidden string.
+
+<img src="/heyd/Screenshot%202023-02-25%20233837.png" alt="A revealing comment on a collaboration post." style={{ width: "100%" }} />
+
+This gave me the final piece: **`Y0u4r3ThE0s1nTm45t3R`**.
+
+---
+
+## 🚩 The Final Flag
+
+After assembling all five parts and trying the two possible timestamps, I constructed the correct flag.
+
+```
+ARA2023{44793134117_BNU_Molly_3Juni2019-10:25_Y0u4r3ThE0s1nTm45t3R}
+```
+
+<img src="/heyd/osint-hey.png" alt="The final flag accepted by the challenge platform." style={{ width: "100%" }} />
