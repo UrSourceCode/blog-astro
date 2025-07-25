@@ -1,0 +1,65 @@
+---
+title: 'Warped Image - A SpringForward CTF Challenge'
+description: 'A CTF write-up for a forensics challenge that involves repairing a corrupted JPEG file by correcting its magic bytes using a hex editor.'
+pubDate: 'Mar 13 2023'
+heroImage: '/blog-placeholder-3.jpg'
+categories: ["CTF", "SpringForward CTF", "Forensics"]
+---
+
+## 📝 The Challenge
+
+> This image was warped through time and something must have happened to it as we an no longer see it!
+> 
+> Can you help us so we can see the image?
+> 
+> Developed by ihanna2
+
+---
+
+## 🕵️‍♂️ Investigation and Discovery
+
+The challenge provided a file named `Image2.jpg`. Despite its `.jpg` extension, it wouldn't open in any image viewer. This immediately suggested that the file was corrupted or not a true JPEG file.
+
+To verify, I first ran the `file` command:
+<img src="/assets/Screenshot%202023-03-13%20104826.png" alt="The file command returning 'data' for the jpg file." style={{ width: "100%" }} />
+
+The output `data` confirmed that the operating system couldn't identify the file type. My hypothesis was that the file's header, which contains its identifying "magic bytes," had been altered. The plan was to inspect the raw hexadecimal data of the file and compare its header to the standard signature for a JPEG file.
+
+---
+
+## 🔧 Executing the Solution
+
+I used the `xxd` command to dump the file's hex content to the terminal.
+
+<img src="/assets/Screenshot%202023-03-13%20105058.png" alt="The xxd command showing the hex dump of the corrupted file." style={{ width: "100%" }} />
+
+The hex dump started with `FF D8 FF DB`. A quick online search for the JPEG file signature revealed that it should begin with `FF D8 FF E0`. The problem was obvious: the fourth byte was `DB` instead of `E0`.
+
+To fix this, I used an online hex editor. I uploaded the corrupted file, navigated to the fourth byte (offset `0x03`), and changed the value from `DB` to `E0`.
+
+<img src="/assets/Screenshot%202023-03-13%20105539.png" alt="Using an online hex editor to change the corrupted byte from DB to E0." style={{ width: "100%" }} />
+
+After saving the modified file, the corruption was fixed. The file was now a valid JPEG image and opened correctly, displaying the flag.
+
+---
+
+## ✨ A Note on Magic Bytes
+
+This challenge is a classic example of "magic byte" analysis. Magic bytes are the first few bytes of a file that serve as a signature to identify the file format. For example:
+* **JPEG/JFIF:** `FF D8 FF E0`
+* **PNG:** `89 50 4E 47`
+* **PDF:** `25 50 44 46`
+
+Operating systems and applications often rely on these bytes rather than the file extension to understand how to process a file. When these bytes are corrupted or incorrect, the file becomes unreadable, even if the rest of its data is intact.
+
+---
+
+## 🚩 The Final Flag
+
+The repaired image revealed the solution:
+
+<img src="/assets/Image2.jpg" alt="The recovered image showing the flag." style={{ width: "100%" }} />
+
+```
+nicc{F0rensics_M@gic_Byt3$!}
+```
