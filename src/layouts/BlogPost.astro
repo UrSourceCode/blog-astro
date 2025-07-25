@@ -1,13 +1,14 @@
 ---
+// src/layouts/BlogPost.astro
 import type { CollectionEntry } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
+import slugify from 'slugify';
 
 type Props = CollectionEntry<'blog'>['data'];
-
-const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, categories } = Astro.props;
 ---
 
 <html lang="en">
@@ -52,6 +53,16 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
 			.last-updated-on {
 				font-style: italic;
 			}
+			.categories {
+				margin-bottom: 0.75em;
+			}
+			.categories a {
+				color: rgb(var(--accent));
+				text-decoration: none;
+			}
+			.categories a:hover {
+				text-decoration: underline;
+			}
 		</style>
 	</head>
 
@@ -66,17 +77,30 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
 					<div class="title">
 						<div class="date">
 							<FormattedDate date={pubDate} />
-							{
-								updatedDate && (
-									<div class="last-updated-on">
-										Last updated on <FormattedDate date={updatedDate} />
-									</div>
-								)
-							}
+							{updatedDate && (
+								<div class="last-updated-on">
+									Last updated on <FormattedDate date={updatedDate} />
+								</div>
+							)}
 						</div>
+
 						<h1>{title}</h1>
+
+						{categories && categories.length > 0 && (
+							<div class="categories">
+								Categories:
+								{categories.map((c, i) => (
+									<>
+										<a href={`/blog/category/${slugify(c, { lower: true })}`}>{c}</a>
+										{i < categories.length - 1 ? '|' : ''}
+									</>
+								))}
+							</div>
+						)}
+
 						<hr />
 					</div>
+
 					<slot />
 				</div>
 			</article>

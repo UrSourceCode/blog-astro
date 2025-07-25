@@ -1,14 +1,21 @@
 ---
+// src/pages/blog/index.astro
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
 import { getCollection } from 'astro:content';
 import FormattedDate from '../../components/FormattedDate.astro';
+import slugify from 'slugify';
 
 const posts = (await getCollection('blog')).sort(
-	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
+
+//const posts = (await getCollection('blog')) as Array<CollectionEntry<'blog'>>;
+
+// Extract unique categories
+const categories = [...new Set(posts.flatMap(post => post.data.categories))];
 ---
 
 <!doctype html>
@@ -88,21 +95,30 @@ const posts = (await getCollection('blog')).sort(
 	<body>
 		<Header />
 		<main>
+			<!-- Category List -->
+			<!-- <section>
+				<h2>Browse by Category</h2>
+				<ul>
+					{categories.map(cat => (
+						<li><a href={`/blog/category/${slugify(cat, { lower: true })}`}>{cat}</a></li>
+					))}
+				</ul>
+			</section> -->
+
+			<!-- Blog Post Cards -->
 			<section>
 				<ul>
-					{
-						posts.map((post) => (
-							<li>
-								<a href={`/blog/${post.id}/`}>
-									<img width={720} height={360} src={post.data.heroImage} alt="" />
-									<h4 class="title">{post.data.title}</h4>
-									<p class="date">
-										<FormattedDate date={post.data.pubDate} />
-									</p>
-								</a>
-							</li>
-						))
-					}
+					{posts.map((post) => (
+						<li>
+							<a href={`/blog/${post.id}/`}>
+								<img width={720} height={360} src={post.data.heroImage} alt="" />
+								<h4 class="title">{post.data.title}</h4>
+								<p class="date">
+									<FormattedDate date={post.data.pubDate} />
+								</p>
+							</a>
+						</li>
+					))}
 				</ul>
 			</section>
 		</main>
