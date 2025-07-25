@@ -1,0 +1,59 @@
+---
+title: 'whereIsThis - A Joints CTF 2023 Challenge'
+description: 'A write-up for the Joints CTF 2023 OSINT challenge "whereIsThis," which involves using Google Maps to pinpoint a specific location based on visual and directional clues, while avoiding a clever red herring.'
+pubDate: 'Nov 15 2023'
+heroImage: '/blog-placeholder-7.jpg'
+categories: ["CTF", "Joints CTF 2023", "OSINT"]
+---
+
+## 📝 The Challenge
+
+> 100pts
+> 
+> Jota and Krint headed from Tugu Jogja to the north, for some reason Jota and Krint separated, Krint's cellphone ran out of battery and the last photo she sent was a photo of Indomaret version dated January 2022, please help Jota find Indomaret's address to meet Krint. Enter your answer in capital letters using the format JCTF2023{PLUSCODE_KELURAHAN}.
+> 
+> Author: Jears #8964
+>
+> https://drive.google.com/file/d/11abiA8bnjYmeM6HHYkJ9-__629EQX7Hs/view?usp=share_link
+
+---
+
+## 🧭 Initial Investigation & The Red Herring
+
+The most unique visual clue in the provided image was the **"Pentol Mbokdhe"** food cart. My immediate strategy was to search for this on Google Maps.
+
+<img src="/assets/pentol.png" alt="A Google Maps search result for 'Pentol Mbokdhe'." style={{ width: "100%" }} />
+
+The search returned a location with the Plus Code `69FC+8V` and listed its *kelurahan* (subdistrict) as `NGESTIHARJO`. Believing I had found it, I constructed the flag `JCTF2023{69FC+8V_NGESTIHARJO}`, but it was incorrect. The food cart's location was a trap.
+
+---
+
+## 📍 Finding the Correct Location
+
+After the failed attempt, I re-read the description and focused on the key directional clue I had overlooked: **"headed from Tugu Jogja to the north."**
+
+I changed my strategy completely. Ignoring the food cart, I centered my map on the Tugu Jogja landmark and began to visually scan northward for Indomaret stores, trying to match the street view with the challenge image.
+
+This approach quickly led me to the correct store.
+
+<img src="/assets/flag.png" alt="The correct Indomaret location on Google Maps, north of Tugu Jogja." style={{ width: "100%" }} />
+
+Upon inspection, I found the twist: the Indomaret had the *same* Plus Code (`69FC+8V`) but was located in a different *kelurahan*: **`TERBAN`**.
+
+---
+
+## ✨ A Note on the Google Maps Quirk
+
+This challenge cleverly exploits a common quirk in Google Maps. The Indomaret store and the "Pentol Mbokdhe" food cart are at the same physical location, but their registered map pins are slightly different. This resulted in them being assigned to two different administrative subdistricts, with the food cart's pin serving as the misdirection.
+
+<img src="/assets/same.png" alt="A screenshot showing the two separate pins for the Indomaret and the Pentol cart at the same location." style={{ width: "100%" }} />
+
+---
+
+## 🚩 The Final Flag
+
+Using the correct details from the Indomaret's official map pin, the final flag was:
+
+```
+JCTF2023{69FC+8V_TERBAN}
+```
