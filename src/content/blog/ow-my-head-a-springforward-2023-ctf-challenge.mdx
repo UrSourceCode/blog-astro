@@ -1,0 +1,63 @@
+---
+title: 'Ow, My Head - A SpringForward CTF Challenge'
+description: 'A write-up for the SpringForward CTF OSINT challenge that involves extracting EXIF metadata from an image to find GPS coordinates and a creation date, then using Google Maps to identify the location.'
+pubDate: 'Mar 13 2023'
+heroImage: '/blog-placeholder-4.jpg'
+categories: ["CTF", "SpringForward CTF", "OSINT"]
+---
+
+## 📝 The Challenge
+
+> We went out last night to party during spring break, or was it a few nights from now or the other day we went out? Look, I don't know. It's spring break. All I know is this dude Arbys was buying drinks and then next thing I know: Bam, wake up and everybody's all weird. Can you come get me? Anna's god knows where, but I'll help you find her if you find me. No idea where I am though. Here's a pic of a super shady atm by the bar I woke up in front of. Everything's closed but I think we sang here last night.
+> 
+> Find when I created this and where I am. No spaces, no cases. flag format `nicc{yyyymmddbarname}`
+>
+> Developed by Cyb3rSw0rd
+
+---
+
+## 🕵️‍♂️ Investigation and Discovery
+
+The challenge gives us a story and an image file, [totallysafeatm.jpg](https://drive.google.com/file/d/18uKFQthgu33uzmWCpl8GO1YdC8NTcuzK/view?usp=sharing). The goal is to find a date and a location name. Whenever an original image file is provided in a challenge, the first thing to check for is hidden data embedded within the file itself.
+
+My immediate plan was to inspect the image's **EXIF metadata**. This data, often stored automatically by cameras and smartphones, can contain a wealth of information, including timestamps and, crucially, GPS coordinates. My tool of choice for this is `exiftool`.
+
+---
+
+## 🔧 Executing the Solution
+
+I ran `exiftool` on the image file to see what data it held.
+
+<img src="/assets/Screenshot%202023-03-13%20122040.png" alt="The output of the exiftool command showing the image's metadata." style={{ width: "100%" }} />
+
+The output immediately gave me the two most important clues:
+* **Create Date:** `2033:03:16 12:05:01`
+* **GPS Position:** `28 deg 32' 27.60" N, 81 deg 22' 4.80" W`
+
+With the GPS coordinates, I used an online [GPS Coordinates Finder](https://gps-coordinates.org/) to pinpoint the location on a map.
+
+<img src="/assets/Screenshot%202023-03-13%20122536.png" alt="A map showing the location based on the GPS coordinates." style={{ width: "100%" }} />
+
+The coordinates placed me on a street in Orlando, Florida. To identify the bar mentioned in the prompt, I switched to Google Maps Street View for that exact location. Looking around, I found a bar right next to the ATM called **"Planet Rose"**.
+
+<img src="/assets/Screenshot%202023-03-13%20124104.png" alt="Google Street View showing the Planet Rose bar." style={{ width: "100%" }} />
+
+I now had both parts of the flag:
+* **Date (`yyyymmdd`):** From the EXIF data, `20330316`.
+* **Bar Name:** From Street View, `planetrose`.
+
+---
+
+## ✨ A Note on EXIF Data
+
+EXIF (Exchangeable Image File Format) is a standard that embeds metadata into image files. This can include camera settings, lens information, timestamps, and—if location services are enabled on the device—precise GPS coordinates. This challenge is a classic reminder of how much information can be unintentionally shared through a single photo, making EXIF data a fundamental tool in OSINT investigations.
+
+---
+
+## 🚩 The Final Flag
+
+Combining the date and the bar name according to the specified format (`nicc{yyyymmddbarname}`), I got the final flag:
+
+```
+nicc{20330316planetrose}
+```
