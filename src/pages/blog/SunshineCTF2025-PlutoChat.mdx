@@ -1,0 +1,194 @@
+---
+title: 'Reverse Engineering - PlutoChat Encryption'
+description: 'CTF challenge involving RE of a chat application with custom encryption.'
+pubDate: 'Sep 30 2025'
+heroImage: '/blog-placeholder-1.jpg'
+categories: ["CTF", "Reverse Engineering", "Forensics", "Networking"]
+---
+
+##✉️  Challenge Overview
+We got two files: a 64-bit ELF binary and a pcap capture.
+
+First thing, I started with the pcap. It had 22 packets over loop-able 31337 port and not all of them carried data. Using `tcp.len > 0`, they left me with 11 packets carrying actual payloads.
+
+Confusing about the pcap, I moved to the binary. I ran `strings` on the binary and saw some fun stuff:
+
+```
+Type a username to send a message to, or 'EXIT' to exit:
+EXIT
+Exiting PlutoChat...
+Send a message to %s (or 'EXIT' to select a new user):
+Login successful! Welcome to PlutoChat!
+%d %d
+New message from %s: %s
+There was an error initializing PlutoChat. Please try again.
+Login to PlutoChat
+Username:
+Password:
+Could not connect to PlutoChat servers. Try again later!
+127.0.0.1
+```
+
+Looks like a chat client.
+
+## 🧠 Investigation and Discovery
+
+I opened it in Ghidra to see how the encryption worked. The function that calls send() allocates a buffer, writes a random header and the length, then calls a couple of helper functions before sending it out. 
+
+Breaking it down:
+
+- `FUN_00101687` makes a 4-byte random header.
+- `FUN_00101510` turns that into an 80-byte key. It does this with bit rotations, a 20-byte permutation table (`DAT_00104100`), and a 256-byte substitution table (`DAT_00104120`).
+- That key goes into `FUN_00101389`, which is exactly the RC4 Key Scheduling Algorithm (KSA).
+- Finally, `FUN_00101452` runs the PRGA, XORs the keystream with the plaintext, and produces the ciphertext.
+
+So the message format is `[header][length][ciphertext]`, with RC4 as the cipher. The only twist is the custom key expansion from the header.
+
+## 🔧 Decrypting the Messages
+
+Since I already knew that there is 8 packets with messages, I wrote a script to pull the payloads from the pcap:
+
+```python
+...
+def parse_pcap(path):
+    with open(path,'rb') as f:
+        data = f.read()
+    off = 24
+    while off + 16 <= len(data):
+        ts_sec, ts_usec, incl_len, orig_len = struct.unpack('<IIII', data[off:off+16])
+        off += 16
+        pkt = data[off:off+incl_len]
+        off += incl_len
+        yield ts_sec + ts_usec/1e6, pkt
+def parse_ipv4_tcp(pkt):
+    if len(pkt) < 14 or pkt[12:14] != b'\x08\x00':
+        return None
+    ip = pkt[14:]
+    ihl = (ip[0] & 0x0F)*4
+    if len(ip) < ihl:
+        return None
+    if ip[9] != 6:  # not TCP
+        return None
+    tcp = ip[ihl:]
+    if len(tcp) < 20:
+        return None
+    doff = ((tcp[12] >> 4) & 0x0F)*4
+    if len(tcp) < doff:
+        return None
+    payload = tcp[doff:]
+    src = '.'.join(map(str, ip[12:16]))
+    dst = '.'.join(map(str, ip[16:20]))
+    sport = int.from_bytes(tcp[0:2],'big')
+    dport = int.from_bytes(tcp[2:4],'big')
+    return (src, sport, dst, dport), payload
+
+def reassemble_streams(pcap_path):
+    streams = defaultdict(bytearray)
+    for t,pkt in parse_pcap(pcap_path):
+        parsed = parse_ipv4_tcp(pkt)
+        if not parsed:
+            continue
+        key, payload = parsed
+        if payload:
+            streams[key] += payload
+    return streams
+
+def extract_frames_from_buffer(buf):
+    """Scan a contiguous buffer for frames of form:
+       [4B header][4B LE length][len bytes ciphertext].
+       Return list of (header_bytes, ciphertext_bytes).
+    """
+    frames = []
+    off = 0
+    while True:
+        if off + 8 > len(buf):
+            break
+        header = buf[off:off+4]
+        ln = int.from_bytes(buf[off+4:off+8], 'little')
+        if ln <= 0:
+            off += 1
+            continue
+        if off + 8 + ln > len(buf):
+            break
+        ct = buf[off+8:off+8+ln]
+        frames.append((header, ct))
+        off += 8 + ln
+    return frames
+...
+```
+
+And the result is:
+```
+[0] c6237f77 7eba8d0f617bf90990dad469793c700fa16724ea028c3d4db57e0c80a077e0d5
+[1] 7fc8fe7f f31cd383bb6fdd8f41a8924099f79eda967f039fda8253b668843bd32cd8e6b...
+...
+```
+
+Then I built a decryptor:
+
+```python
+...
+def rol32(x, r):
+    r &= 31
+    return ((x << r) & 0xffffffff) | (x >> (32 - r))
+
+def key_from_header(header_le_bytes: bytes) -> bytes:
+    seed = int.from_bytes(header_le_bytes, 'little') & 0xffffffff
+    # Step A: build 20 dwords
+    words, val = [], seed
+    for _ in range(20):
+        words.append(val)
+        val = rol32(val, val & 0xF)
+    # Step B: permute words
+    w = words[:]
+    for i in range(20):
+        j = PERM20[i]
+        w[i], w[j] = w[j], w[i]
+    # Step C: flatten + SUB256 with feedback
+    b = bytearray()
+    for v in w: b += v.to_bytes(4,'little')
+    out, prev = bytearray(80), 0
+    for i in range(80):
+        out[i] = SUB256[b[i]] ^ prev
+        prev = out[i]
+    return bytes(out)
+
+def rc4_init(key: bytes):
+    S = list(range(256))
+    j = 0
+    for i in range(256):
+        j = (j + S[i] + key[i % len(key)]) & 0xFF
+        S[i], S[j] = S[j], S[i]
+    return S
+
+def rc4_crypt(S_init, data: bytes) -> bytes:
+    S, i, j, out = S_init[:], 0, 0, bytearray(len(data))
+    for n in range(len(data)):
+        i = (i + 1) & 0xFF
+        j = (j + S[i]) & 0xFF
+        S[i], S[j] = S[j], S[i]
+        K = S[(S[i] + S[j]) & 0xFF]
+        out[n] = data[n] ^ K
+    return bytes(out)
+
+def decode_message(pt: bytes) -> str:
+    try:
+        t = pt[0]
+        nlen = pt[1]
+        name = pt[2:2+nlen].decode('utf-8','replace')
+        text = pt[2+nlen:].decode('utf-8','replace')
+        return f"type=0x{t:02x} name={name} text={text}"
+    except Exception:
+        return pt.decode('utf-8','replace')
+...
+```
+
+The permutation and substitution are derived from the binary's data sections as I mentioned earlier.
+
+## 🎉 The Decrypted Messages
+
+Once I ran it, the decrypted messages popped out.
+
+```
+sun{S3cur1ty_thr0ugh_Obscur1ty_1s_B4D}
+```
