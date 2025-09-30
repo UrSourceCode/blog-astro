@@ -6,10 +6,14 @@ heroImage: '/blog-placeholder-1.jpg'
 categories: ["CTF", "Reverse Engineering", "Forensics", "Networking"]
 ---
 
-##✉️  Challenge Overview
+## ✉️  Challenge Overview
 We got two files: a 64-bit ELF binary and a pcap capture.
 
-First thing, I started with the pcap. It had 22 packets over loop-able 31337 port and not all of them carried data. Using `tcp.len > 0`, they left me with 11 packets carrying actual payloads.
+First thing, I started with the pcap. It had 22 packets over loop-able 31337 port and not all of them carried data. 
+<img src="/assets/image/sunshine2025-pluto/22-packets.png" alt="Wireshark overview of the pcap file, showing 22 packets over TCP port 31337." />
+
+Using `tcp.len > 0`, they left me with 8 packets carrying actual payloads.
+<img src="/assets/image/sunshine2025-pluto/8-packets.png" alt="Wireshark filtered view showing 8 packets with data." />
 
 Confusing about the pcap, I moved to the binary. I ran `strings` on the binary and saw some fun stuff:
 
@@ -34,6 +38,8 @@ Looks like a chat client.
 ## 🧠 Investigation and Discovery
 
 I opened it in Ghidra to see how the encryption worked. The function that calls send() allocates a buffer, writes a random header and the length, then calls a couple of helper functions before sending it out. 
+
+<img src="/assets/image/sunshine2025-pluto/func-ghidra.png" alt="Ghidra view of the function." />
 
 Breaking it down:
 
@@ -188,6 +194,8 @@ The permutation and substitution are derived from the binary's data sections as 
 ## 🎉 The Decrypted Messages
 
 Once I ran it, the decrypted messages popped out.
+
+<img src="/assets/image/sunshine2025-pluto/flag.png" alt="Decrypted messages from the chat application." />
 
 ```
 sun{S3cur1ty_thr0ugh_Obscur1ty_1s_B4D}
