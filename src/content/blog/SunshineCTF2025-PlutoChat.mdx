@@ -37,22 +37,50 @@ Looks like a chat client.
 
 ## 🧠 Investigation and Discovery
 
-I opened it in Ghidra to see how the encryption worked. The function that calls send() allocates a buffer, writes a random header and the length, then calls a couple of helper functions before sending it out. 
+I loaded the binary into Ghidra to trace how the encryption works. The function that eventually calls send() builds the message like this: it allocates a buffer, writes a random 4-byte header plus the plaintext length, prepares the cipher state, encrypts the message, and then sends `[header][length][ciphertext]`.
 
-<img src="/assets/image/sunshine2025-pluto/func-ghidra.png" alt="Ghidra view of the function." />
+Functions breakdown:
 
-Breaking it down:
+- **`FUN_00101687`**  
+  Generates a random 4-byte header using two `rand()` calls. This header acts as the seed for key expansion.  
 
-- `FUN_00101687` makes a 4-byte random header.
-- `FUN_00101510` turns that into an 80-byte key. It does this with bit rotations, a 20-byte permutation table (`DAT_00104100`), and a 256-byte substitution table (`DAT_00104120`).
-- That key goes into `FUN_00101389`, which is exactly the RC4 Key Scheduling Algorithm (KSA).
-- Finally, `FUN_00101452` runs the PRGA, XORs the keystream with the plaintext, and produces the ciphertext.
+- **`FUN_00101510`**  
+  Expands the 4-byte header into an 80-byte key:  
+  1. Repeatedly rotates the seed and collects 20 words.  
+  2. Rearranges them using the 20-byte permutation table (`DAT_00104100`).  
+  3. Runs the result through the 256-byte substitution table (`DAT_00104120`) with feedback XOR.  
 
-So the message format is `[header][length][ciphertext]`, with RC4 as the cipher. The only twist is the custom key expansion from the header.
+  ![Example view of the function](/assets/image/sunshine2025-pluto/func-ghidra.png)  
+
+- **`FUN_00101389`**  
+  Implements RC4 **Key Scheduling Algorithm (KSA)**. Initializes the S-box with 0–255, then scrambles it with the 80-byte key.  
+
+- **`FUN_00101285`**  
+  A helper that swaps two entries in the RC4 state array. Used by both KSA and PRGA.  
+
+- **`FUN_001012e5`**  
+  Implements RC4 **PRGA**. Updates indices, swaps values, and outputs one keystream byte at a time.  
+
+- **`FUN_00101452`**  
+  The encryption loop. Takes each plaintext byte, XORs it with the next keystream byte from `FUN_001012e5`, and produces ciphertext.  
+
+- **`FUN_001014bf`**  
+  A keystream “warm-up” function. It discards a specified number of initial PRGA bytes (classic RC4 mitigation).  
+
+- **`FUN_001014f8`**  
+  Simple 32-bit rotate-left, used during key expansion.  
+
+- **`FUN_001016a7`**  
+  The “message sender.” It ties everything together:  
+  1. Generates a random header.  
+  2. Sets up the RC4 state with `FUN_00101510` + `FUN_00101389`.  
+  3. Encrypts plaintext with `FUN_00101452`.  
+  4. Sends `[header][length][ciphertext]` via `send()`.  
+
 
 ## 🔧 Decrypting the Messages
 
-Since I already knew that there is 8 packets with messages, I wrote a script to pull the payloads from the pcap:
+Since I already knew that there is 8 packets with messages, using my best friend [https://chatgpt.com/](ChatGPT) I generated a script to pull the payloads from the pcap:
 
 ```python
 ...
@@ -100,10 +128,6 @@ def reassemble_streams(pcap_path):
     return streams
 
 def extract_frames_from_buffer(buf):
-    """Scan a contiguous buffer for frames of form:
-       [4B header][4B LE length][len bytes ciphertext].
-       Return list of (header_bytes, ciphertext_bytes).
-    """
     frames = []
     off = 0
     while True:
@@ -140,17 +164,14 @@ def rol32(x, r):
 
 def key_from_header(header_le_bytes: bytes) -> bytes:
     seed = int.from_bytes(header_le_bytes, 'little') & 0xffffffff
-    # Step A: build 20 dwords
     words, val = [], seed
     for _ in range(20):
         words.append(val)
         val = rol32(val, val & 0xF)
-    # Step B: permute words
     w = words[:]
     for i in range(20):
         j = PERM20[i]
         w[i], w[j] = w[j], w[i]
-    # Step C: flatten + SUB256 with feedback
     b = bytearray()
     for v in w: b += v.to_bytes(4,'little')
     out, prev = bytearray(80), 0
@@ -200,3 +221,7 @@ Once I ran it, the decrypted messages popped out.
 ```
 sun{S3cur1ty_thr0ugh_Obscur1ty_1s_B4D}
 ```
+
+## 🧙🏻‍♀️ Resources
+
+- [Reversing Crypto Functions](https://goggleheadedhacker.com/blog/post/reversing-crypto-functions)
